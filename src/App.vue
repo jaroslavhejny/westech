@@ -1,26 +1,34 @@
-<template>
-  <img alt="Vue logo" src="./assets/logo.png">
-  <HelloWorld msg="Welcome to Your Vue.js App"/>
-</template>
+<script setup>
+import { onMounted } from 'vue'
+import { useDataStore } from '/stores/dataStore'
+import WTable from "@/components/WTable.vue";
+import storeNameWorker from "worker-loader!@/worker/storeName.worker"
+import categoryNameWorker from "worker-loader!@/worker/category.worker"
+import WLoader from "@/components/WLoader.vue";
+const store = useDataStore()
 
-<script>
-import HelloWorld from './components/HelloWorld.vue'
-
-export default {
-  name: 'App',
-  components: {
-    HelloWorld
+onMounted(async () => {
+  store.setLoading(true);
+  const data = await fetch(process.env.VUE_APP_URL);
+  const productData = await data.json();
+  store.setAllData(productData);
+  const storeName = new storeNameWorker();
+  const category = new categoryNameWorker();
+  storeName.postMessage(productData);
+  storeName.onmessage = ({data}) => {
+    store.setStoreNames(data);
   }
-}
+  category.postMessage(productData);
+  category.onmessage = ({data}) => {
+    store.setCategories(data)
+    store.setLoading(false);
+
+  }
+})
 </script>
 
-<style>
-#app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #2c3e50;
-  margin-top: 60px;
-}
-</style>
+<template>
+  <WLoader v-if="store.loading" />
+  <div v-else-if="store.error">Chyba: {{ store.error }}</div>
+  <W-Table v-else />
+</template>
